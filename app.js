@@ -17,12 +17,13 @@ scene.add(new THREE.HemisphereLight(0xffffff,0x4c545e,2.8));
 for(const [color,power,x,y,z] of [[0xffffff,3.2,-5,9,8],[0xdcecff,2.1,7,4,-7]]){
  const light=new THREE.DirectionalLight(color,power);light.position.set(x,y,z);scene.add(light);
 }
-const config={wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0};
-const root=new THREE.Group();scene.add(root);
+const config={wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,lip:'off'};
+const root=new THREE.Group();root.rotation.x=-Math.PI/2;scene.add(root);
+let lipObject=null;
 const bodyRoot=new THREE.Group();root.add(bodyRoot);
 const wheelRoot=new THREE.Group();root.add(wheelRoot);
 const wheelSets=[];
-const HUB_X=.735, HUB_Y=.300, HUB_FRONT=-1.236, HUB_REAR=1.244;
+const HUB_X=.735, HUB_Z=.300, HUB_FRONT=-1.236, HUB_REAR=1.244;
 const lipMaterial=new THREE.MeshStandardMaterial({color:0xe6e8eb,metalness:.95,roughness:.14});
 const innerMaterial=new THREE.MeshStandardMaterial({color:0xb9bec4,metalness:.75,roughness:.27});
 const boltMaterial=new THREE.MeshStandardMaterial({color:0xd3d7dc,metalness:.9,roughness:.21});
@@ -31,10 +32,10 @@ const tireMaterial=new THREE.MeshStandardMaterial({color:0x17191c,roughness:.94}
 const loader=new GLTFLoader();
 let ssrScene;
 
-for(const z of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
- const pivot=new THREE.Group();pivot.position.set(x,HUB_Y,z);wheelRoot.add(pivot);
+for(const y of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
+ const pivot=new THREE.Group();pivot.position.set(x,y,HUB_Z);wheelRoot.add(pivot);
  const factory=new THREE.Group(),aftermarket=new THREE.Group();pivot.add(factory,aftermarket);
- wheelSets.push({x,z,pivot,factory,aftermarket,front:z===HUB_FRONT});
+ wheelSets.push({x,y,pivot,factory,aftermarket,front:y===HUB_FRONT});
 }
 
 // The car GLB combines all four wheels into each mesh. Divide each wheel mesh
@@ -50,14 +51,14 @@ function extractCorners(mesh,body){
  for(let i=0;i<n;i+=3){
   const a=index?index.getX(i):i,b=index?index.getX(i+1):i+1,c=index?index.getX(i+2):i+2;
   const x=(pos.getX(a)+pos.getX(b)+pos.getX(c))/3;
-  const z=(pos.getZ(a)+pos.getZ(b)+pos.getZ(c))/3;
-  const corner=wheelSets.findIndex(w=>(w.x>0)===(x>0)&&(w.z>0)===(z>0));
+  const y=(pos.getY(a)+pos.getY(b)+pos.getY(c))/3;
+  const corner=wheelSets.findIndex(w=>(w.x>0)===(x>0)&&(w.y>0)===(y>0));
   if(corner>=0)buckets[corner].push(a,b,c);
  }
  buckets.forEach((triangles,i)=>{
   if(!triangles.length)return;
   const g=geometry.clone();g.setIndex(triangles);
-  const w=wheelSets[i];g.translate(-w.x,-HUB_Y,-w.z);
+  const w=wheelSets[i];g.translate(-w.x,-w.y,-HUB_Z);
   const part=new THREE.Mesh(g,mesh.material);
   part.name=mesh.name;w.factory.add(part);
  });
@@ -102,17 +103,18 @@ function makeSSR(type,side){
  }
  // Original parts face outwards on +X. Flip only the left-hand wheels.
  if(side<0)wheel.rotation.y=Math.PI;
- const tire=new THREE.Mesh(new THREE.TorusGeometry(.259,.045,14,48),tireMaterial);
+ const tire=new THREE.Mesh(new THREE.TorusGeometry(.252,.050,16,64),tireMaterial);
  tire.rotation.y=Math.PI/2;wheel.add(tire);
  return wheel;
 }
 function applySetup(){
  faceMaterial.color.set(config.face);
- bodyRoot.position.y=-config.ride/1000;
+ bodyRoot.position.z=-config.ride/1000;
+ if(lipObject)lipObject.visible=config.lip==='on';
  for(const w of wheelSets){
   const angle=THREE.MathUtils.degToRad(w.front?config.front:config.rear);
   // Negative camber means tops inward, on both sides.
-  w.pivot.rotation.z=-Math.sign(w.x)*angle;
+  w.pivot.rotation.y=Math.sign(w.x)*angle;
   w.factory.visible=config.wheel==='stock';
   w.aftermarket.visible=config.wheel!=='stock';
   while(w.aftermarket.children.length){
@@ -125,20 +127,26 @@ function applySetup(){
  $('frontOut').textContent=`${Number(config.front).toFixed(1)}°`;
  $('rearOut').textContent=`${Number(config.rear).toFixed(1)}°`;
 }
-for(const id of ['wheel','face','ride','front','rear'])$(id).addEventListener('input',e=>{
+for(const id of ['wheel','face','ride','front','rear','lip'])$(id).addEventListener('input',e=>{
  config[id]=['ride','front','rear'].includes(id)?Number(e.target.value):e.target.value;
  applySetup();
 });
 $('reset').onclick=()=>{
- Object.assign(config,{wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0});
- for(const id of ['wheel','face','ride','front','rear'])$(id).value=config[id];applySetup();
+ Object.assign(config,{wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,lip:'off'});
+ for(const id of ['wheel','face','ride','front','rear','lip'])$(id).value=config[id];applySetup();
 };
 function panel(open){$('panel').classList.toggle('hidden',!open);document.body.classList.toggle('panel-open',open);$('toggle').setAttribute('aria-expanded',String(open))}
 $('toggle').onclick=()=>panel(true);$('close').onclick=()=>panel(false);panel(innerWidth>640);
 
 async function load(){
  try{
-  const [car,ssr]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_collection.glb')]);
+  const [car,ssr,lip]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_collection.glb'),loader.loadAsync('./180sx-front-lip.glb')]);
+  lipObject=lip.scene;
+  // Lip GLB was exported in a Y-up coordinate frame. Convert into car's Z-up frame.
+  lipObject.rotation.x=Math.PI/2;
+  // The lip's front-to-back axis in the source asset maps to the car's longitudinal Y.
+  lipObject.position.set(0,-.06,0);
+  bodyRoot.add(lipObject);
   ssrScene=ssr.scene;
   const body=car.scene;body.updateMatrixWorld(true);
   const wheels=[];
@@ -159,7 +167,8 @@ async function load(){
   // receive the same root transform and remain correctly aligned.
   const box=new THREE.Box3().setFromObject(body);
   const center=box.getCenter(new THREE.Vector3());
-  root.position.set(-center.x,-center.y,-center.z);
+  // Centre the source model before applying its Z-up to Y-up conversion.
+  root.position.set(-center.x,center.z,-center.y);
   camera.position.set(5.2,2.6,6.4);orbit.target.set(0,0,0);orbit.update();
   applySetup();$('loading').remove();
  }catch(err){console.error(err);$('loading').textContent='Could not load model files. Check the GLBs are in the same folder.'}
