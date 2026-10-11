@@ -1,15 +1,12 @@
-PS13 / THE SILVIA — VISUAL REDESIGN
+S13 STUDIO — YOUR UPLOADED 3D MODEL
 
-This is a completely new, editorial-style website for a pearl-white 1992 Nissan Silvia PS13.
-It intentionally has NO modification controls. Drag to rotate; scroll/pinch to zoom.
+Upload ALL FOUR files to the ROOT of your GitHub repo kuiimo/car-dev:
+  index.html
+  styles.css
+  app.js
+  silvia-s13.glb
 
-IMPORTANT: The vehicle is a more detailed custom procedural 3D approximation, NOT a photogrammetry scan or precision factory CAD. It should not be used for real-world part fitment.
+GitHub Pages: Settings > Pages > Deploy from a branch > main > /(root).
+Website: https://kuiimo.github.io/car-dev/
 
-DEPLOY TO YOUR GITHUB REPOSITORY:
-1. Open https://github.com/kuiimo/car-dev
-2. Upload index.html, styles.css, and app.js to the repository root, replacing the old files.
-3. Commit changes. GitHub Pages should update automatically.
-4. Visit https://kuiimo.github.io/car-dev/ and hard-refresh if you see the old design.
-
-The site uses Three.js from esm.sh and Google Fonts, so an internet connection is required.
-No Supabase or backend required.
+The website uses your supplied GLB, not the earlier blocky model. It offers rotation and zoom only. The model uses its original mesh detail; body-paint materials are set to pearl white. The original model creator/licence was not included; confirm you have rights to publish it.
