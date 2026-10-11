@@ -31,7 +31,7 @@ const boltMaterial=new THREE.MeshStandardMaterial({color:0xd3d7dc,metalness:.9,r
 const faceMaterial=new THREE.MeshStandardMaterial({color:config.face,metalness:.76,roughness:.28});
 const tireMaterial=new THREE.MeshStandardMaterial({color:0x17191c,roughness:.94});
 const loader=new GLTFLoader();
-let ssrScene;
+let xr4Scene;
 
 for(const z of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
  const pivot=new THREE.Group();pivot.position.set(x,HUB_Y,z);wheelRoot.add(pivot);
@@ -72,30 +72,26 @@ function extractCorners(mesh,body){
 // All SSR rims in the supplied collection are authored around the X axle.
 // MK2/MK3 decorative centres use a Z axle and are rotated to match the lips.
 // A wheel is assembled at its own origin before placement at each actual hub.
+// XR4 parts are independently centred, and their two different source axes
+// are normalised to the car's X wheel axle before placing on each hub.
 function makeSSR(type,side){
  const wheel=new THREE.Group();
- const names={mk1:'mk1 spokes',mk2:'starshark lip.002',mk3:'starshark lip.004'};
- ssrScene.updateMatrixWorld(true);
- ssrScene.traverse(o=>{
+ xr4Scene.updateMatrixWorld(true);
+ xr4Scene.traverse(o=>{
   if(!o.isMesh)return;
-  const name=o.name.toLowerCase();
-  const lip=name.startsWith(type+' lip');
-  const center=name.startsWith(names[type]);
-  if(!lip&&!center)return;
+  const n=o.name.toLowerCase();
   const g=o.geometry.clone();g.applyMatrix4(o.matrixWorld);
-  // Each original sample is positioned elsewhere in the SSR collection.
-  // Recenter each individual component in its own local bounding box.
   const bounds=new THREE.Box3().setFromBufferAttribute(g.getAttribute('position'));
   const c=bounds.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);
-  if(center&&type!=='mk1')g.rotateY(Math.PI/2);
-  // All assembled wheel parts have their axle along X, with a 3.5-unit lip diameter.
-  const radius=center?(type==='mk1'?1.27:.98):1.75;
-  const scale=.285/radius;
-  g.scale(scale*.55,scale,scale);
-  if(center)g.translate(side*.085,0,0);
-  const mat=name.includes('chrome')?lipMaterial:name.includes('bolts')?boltMaterial:
-            center&&(!name.includes('bolts'))?faceMaterial:innerMaterial;
-  wheel.add(new THREE.Mesh(g,mat));
+  // Lip and bolts are built around Z; spokes/lugs around X.
+  if(n.includes('xr4 lip'))g.rotateY(Math.PI/2);
+  // Scale the 2.65-unit rim diameter to 0.54m.
+  g.scale(.205,.205,.205);
+  // Keep lip at outer side; face just behind the outer rim edge.
+  if(n.includes('spokes')||n.includes('lugs'))g.translate(side*.04,0,0);
+  const material=n.includes('chrome')?lipMaterial:n.includes('bolts')?boltMaterial:
+    n.includes('spokes')?faceMaterial:innerMaterial;
+  wheel.add(new THREE.Mesh(g,material));
  });
  if(side<0)wheel.rotation.y=Math.PI;
  return wheel;
@@ -115,7 +111,7 @@ function applySetup(){
    const child=w.aftermarket.children[0];w.aftermarket.remove(child);
    child.traverse(obj=>{if(obj.geometry)obj.geometry.dispose()});
   }
-  if(config.wheel!=='stock'&&ssrScene)w.aftermarket.add(makeSSR(config.wheel,Math.sign(w.x)));
+  if(config.wheel!=='stock'&&xr4Scene)w.aftermarket.add(makeSSR(config.wheel,Math.sign(w.x)));
  }
  $('rideOut').textContent=`−${config.ride} mm`;
  $('frontOut').textContent=`${Number(config.front).toFixed(1)}°`;
@@ -134,9 +130,9 @@ $('toggle').onclick=()=>panel(true);$('close').onclick=()=>panel(false);panel(in
 
 async function load(){
  try{
-  const [car,ssr,lip]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_collection.glb'),loader.loadAsync('./180sx-front-lip.glb')]);
+  const [car,ssr,lip]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_longchamp_xr4.glb'),loader.loadAsync('./180sx-front-lip.glb')]);
   lipObject=lip.scene;bodyRoot.add(lipObject);
-  ssrScene=ssr.scene;
+  xr4Scene=ssr.scene;
   const body=car.scene;body.updateMatrixWorld(true);
   const wheels=[];
   body.traverse(mesh=>{
