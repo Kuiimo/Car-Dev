@@ -1,1 +1,4 @@
-S13 XR4 wheel update. Upload all files to the root of GitHub car-dev. Select SSR Longchamp XR4 in the wheel setup menu. The uploaded SSR Longchamp XR4 is used, not the old SSR collection. Wheel sizing and lip alignment are still visual approximations; inspect in browser before trusting the fitment.
+S13 Wheel Studio — adjustable front and rear ET
+Upload all website files to the root of your car-dev GitHub repository.
+ET +20 is the starting visual reference. Lower ET moves the wheels outward, higher ET inward.
+The values are visual estimates and are not certified physical wheel offset/clearance measurements.

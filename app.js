@@ -17,7 +17,7 @@ scene.add(new THREE.HemisphereLight(0xffffff,0x4c545e,2.8));
 for(const [color,power,x,y,z] of [[0xffffff,3.2,-5,9,8],[0xdcecff,2.1,7,4,-7]]){
  const light=new THREE.DirectionalLight(color,power);light.position.set(x,y,z);scene.add(light);
 }
-const config={wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,lip:'off'};
+const config={wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,frontET:20,rearET:20,lip:'off'};
 const root=new THREE.Group();scene.add(root);
 let lipObject=null;
 const bodyRoot=new THREE.Group();root.add(bodyRoot);
@@ -104,6 +104,10 @@ function applySetup(){
   const angle=THREE.MathUtils.degToRad(w.front?config.front:config.rear);
   // Negative camber means tops inward, on both sides.
   w.pivot.rotation.z=-Math.sign(w.x)*angle;
+  // ET is positive inward. Keep the factory +20 reference at its current hub position.
+  // Apply offset to the entire corner assembly so camber still pivots about its hub.
+  const et=w.front?config.frontET:config.rearET;
+  w.pivot.position.x=w.x+Math.sign(w.x)*(20-et)/1000;
   w.factory.visible=true;
   for(const part of w.factory.children){const n=part.name.toLowerCase();part.visible=config.wheel==='stock'||n.includes('wheel_tire')||n.includes('brake_')}
   w.aftermarket.visible=config.wheel!=='stock';
@@ -116,14 +120,16 @@ function applySetup(){
  $('rideOut').textContent=`−${config.ride} mm`;
  $('frontOut').textContent=`${Number(config.front).toFixed(1)}°`;
  $('rearOut').textContent=`${Number(config.rear).toFixed(1)}°`;
+ $('frontETOut').textContent=`ET ${config.frontET>=0?'+':''}${config.frontET}`;
+ $('rearETOut').textContent=`ET ${config.rearET>=0?'+':''}${config.rearET}`;
 }
-for(const id of ['wheel','face','ride','front','rear','lip'])$(id).addEventListener('input',e=>{
- config[id]=['ride','front','rear'].includes(id)?Number(e.target.value):e.target.value;
+for(const id of ['wheel','face','ride','front','rear','frontET','rearET','lip'])$(id).addEventListener('input',e=>{
+ config[id]=['ride','front','rear','frontET','rearET'].includes(id)?Number(e.target.value):e.target.value;
  applySetup();
 });
 $('reset').onclick=()=>{
- Object.assign(config,{wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,lip:'off'});
- for(const id of ['wheel','face','ride','front','rear','lip'])$(id).value=config[id];applySetup();
+ Object.assign(config,{wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,frontET:20,rearET:20,lip:'off'});
+ for(const id of ['wheel','face','ride','front','rear','frontET','rearET','lip'])$(id).value=config[id];applySetup();
 };
 function panel(open){$('panel').classList.toggle('hidden',!open);document.body.classList.toggle('panel-open',open);$('toggle').setAttribute('aria-expanded',String(open))}
 $('toggle').onclick=()=>panel(true);$('close').onclick=()=>panel(false);panel(innerWidth>640);
