@@ -2,228 +2,138 @@ import * as THREE from 'https://esm.sh/three@0.160.1';
 import {OrbitControls} from 'https://esm.sh/three@0.160.1/examples/jsm/controls/OrbitControls.js';
 import {GLTFLoader} from 'https://esm.sh/three@0.160.1/examples/jsm/loaders/GLTFLoader.js';
 
-const $=id=>document.getElementById(id);
 const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(38,1,.05,100);
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+const camera=new THREE.PerspectiveCamera(36,1,.05,100);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.4;
-$('viewer').appendChild(renderer.domElement);
-const orbit=new OrbitControls(camera,renderer.domElement);
-orbit.enableDamping=true;orbit.enablePan=false;orbit.minDistance=3;orbit.maxDistance=12;
-scene.add(new THREE.HemisphereLight(0xffffff,0x4c545e,2.8));
-for(const [color,power,x,y,z] of [[0xffffff,3.2,-5,9,8],[0xdcecff,2.1,7,4,-7]]){
- const light=new THREE.DirectionalLight(color,power);light.position.set(x,y,z);scene.add(light);
-}
-const config={wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,frontET:20,rearET:20,lip:'off'};
+renderer.toneMappingExposure=1.48;
+document.querySelector('#stage').append(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.enablePan=false;controls.minDistance=3.2;controls.maxDistance=11;
+controls.minPolarAngle=.18;controls.maxPolarAngle=Math.PI-.18;
+controls.target.set(0,.57,0);camera.position.set(4.6,2.05,-5.9);controls.update();
+scene.add(new THREE.HemisphereLight(0xffffff,0x3c4550,3.0));
+for(const [x,y,z,power] of [[-5,8,-4,3.5],[6,6,5,2.5],[0,9,7,1.7]]){const l=new THREE.DirectionalLight(0xffffff,power);l.position.set(x,y,z);scene.add(l)}
 const root=new THREE.Group();scene.add(root);
-let lipObject=null;
-const bodyRoot=new THREE.Group();root.add(bodyRoot);
-const wheelRoot=new THREE.Group();root.add(wheelRoot);
-const wheelSets=[];
-const factoryTireParts=[];
-const HUB_X=.735, HUB_Y=.300, HUB_FRONT=-1.236, HUB_REAR=1.244;
-const lipMaterial=new THREE.MeshStandardMaterial({color:0xe6e8eb,metalness:.95,roughness:.14});
-const innerMaterial=new THREE.MeshStandardMaterial({color:0xb9bec4,metalness:.75,roughness:.27});
-const boltMaterial=new THREE.MeshStandardMaterial({color:0xd3d7dc,metalness:.9,roughness:.21});
-const faceMaterial=new THREE.MeshStandardMaterial({color:config.face,metalness:.76,roughness:.28});
-const tireMaterial=new THREE.MeshStandardMaterial({color:0x111215,roughness:.97,metalness:0,side:THREE.DoubleSide});
-const tireSidewall=new THREE.MeshStandardMaterial({color:0x151619,roughness:.95,side:THREE.DoubleSide});
-const lipAeroMaterial=new THREE.MeshStandardMaterial({color:0x24262a,roughness:.78,side:THREE.DoubleSide});
-let fittedLip=null;
-// A tyre built as a true annulus, not a flat disc or a mesh taken from the GLB.
-function makeTyre(){
- // Revolved, CLOSED cross-section. Axis of the wheel is X; the tyre has real
- // tread thickness, shoulders and sidewalls, with a hole for the wheel face.
- const wheel=new THREE.Group();
- const half=.118,inner=.248,outer=.334;
+const mat=(color,metalness=0,roughness=.45)=>new THREE.MeshStandardMaterial({color,metalness,roughness,side:THREE.DoubleSide});
+const pearl=mat('#e8e7e2',.3,.24), dark=mat('#181a1c',.07,.74),rubber=mat('#101114',0,.94),sidewall=mat('#17181b',0,.89),silver=mat('#b9bfc6',.76,.27),polished=mat('#e2e5e7',.94,.13),bolt=mat('#b7bdc1',.8,.25),seatCloth=mat('#292b30',0,.88),red=mat('#a51624',.1,.42);
+function mesh(geometry,material,parent=root){const o=new THREE.Mesh(geometry,material);parent.add(o);return o}
+function box(x,y,z,w,h,d,m,parent=root){const o=mesh(new THREE.BoxGeometry(w,h,d),m,parent);o.position.set(x,y,z);return o}
+function cyl(radius,depth,m,parent=root,segments=48){return mesh(new THREE.CylinderGeometry(radius,radius,depth,segments),m,parent)}
+function tube(points,radius,m,parent=root,closed=false){const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)),closed,'centripetal');return mesh(new THREE.TubeGeometry(curve,Math.max(24,points.length*10),radius,10,closed),m,parent)}
+function shapedStrip(points,topY,bottomY,m,parent=root){const verts=[];for(const [x,z] of points)verts.push(x,topY,z,x,bottomY,z);const indices=[];for(let i=0;i<points.length-1;i++){const a=i*2;indices.push(a,a+1,a+2,a+1,a+3,a+2)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));g.setIndex(indices);g.computeVertexNormals();return mesh(g,m,parent)}
+// New four-corner wheel assemblies: every tyre and rim is generated together and shares a single hub pivot.
+// Dimensions: 15-inch rim (381 mm diameter), 195/55 R15 tyre (nominal OD 595.5 mm).
+const tyreOuter=.298, tyreInner=.194, tyreHalf=.105;
+function makeTyre(parent){
  const profile=[
-  new THREE.Vector2(inner,-half),new THREE.Vector2(.276,-half),
-  new THREE.Vector2(.326,-half+.014),new THREE.Vector2(.352,-half+.032),
-  new THREE.Vector2(outer,-half+.048),new THREE.Vector2(outer,half-.048),
-  new THREE.Vector2(.323,half-.032),new THREE.Vector2(.303,half-.014),
-  new THREE.Vector2(.273,half),new THREE.Vector2(inner,half),
-  new THREE.Vector2(inner,-half)
+ [tyreInner,-tyreHalf],[.221,-tyreHalf],[.254,-.101],[.282,-.09],
+ [tyreOuter,-.065],[tyreOuter,.065],[.282,.09],[.254,.101],[.221,tyreHalf],[tyreInner,tyreHalf]
  ];
- const geom=new THREE.LatheGeometry(profile,96);
- // Lathe's revolution axis is Y; the Silvia's wheel axle is X.
- geom.rotateZ(-Math.PI/2);
- const tyre=new THREE.Mesh(geom,tireMaterial);wheel.add(tyre);
- // Narrow sidewall relief rings, still with a clear centre.
- for(const side of [-1,1]){
-  const detail=new THREE.Mesh(new THREE.TorusGeometry(.288,.0028,8,96),tireSidewall);
-  detail.rotation.y=Math.PI/2;detail.position.x=side*.119;wheel.add(detail);
+ const geometry=new THREE.LatheGeometry(profile.map(([r,a])=>new THREE.Vector2(r,a)),96);
+ // Lathe axis Y -> axle X
+ geometry.rotateZ(-Math.PI/2);
+ mesh(geometry,rubber,parent);
+ for(const s of [-1,1]){
+  const side=new THREE.Mesh(new THREE.RingGeometry(tyreInner+.002,.272,80),sidewall);
+  side.rotation.y=Math.PI/2;side.position.x=s*(tyreHalf-.001);parent.add(side);
+  const shoulder=mesh(new THREE.TorusGeometry(.276,.012,10,88),rubber,parent);
+  shoulder.rotation.y=Math.PI/2;shoulder.position.x=s*.089;
  }
- return wheel;
 }
-// The front of this specific Silvia GLB is +Z. The previous lip was at -Z
-// (the rear bumper), hence the loop shown under the exhaust in the screenshot.
-function makeFittedLip(){
- const g=new THREE.Group();
- const points=[[-.81,1.95],[-.81,2.09],[-.68,2.22],[-.43,2.265],[0,2.28],[.43,2.265],[.68,2.22],[.81,2.09],[.81,1.95]];
- // A thin, continuous apron under the bumper, not a round tube.
- const verts=[],uv=[],indices=[];
- for(let i=0;i<points.length;i++){
-  const [x,z]=points[i];
-  for(const [y,shift] of [[.245,0],[.164,.014],[.150,.053]]){
-   verts.push(x,y,z+shift);uv.push(i/(points.length-1),y);
+function makeMK2(parent,side){
+ // Outboard face of wheel points outward, regardless of car side.
+ const wheel=new THREE.Group();wheel.rotation.y=side<0?Math.PI:0;parent.add(wheel);
+ // Cylindrical barrel with open centre; no solid discs covering the face.
+ const barrel=mesh(new THREE.CylinderGeometry(.1905,.1905,.184,72,1,true),dark,wheel);
+ barrel.rotation.z=Math.PI/2;
+ for(const a of [-.086,.086]){
+  const rim=mesh(new THREE.TorusGeometry(.1905,.012,12,96),polished,wheel);
+  rim.rotation.y=Math.PI/2;rim.position.x=a;
+ }
+ const lip=mesh(new THREE.TorusGeometry(.181,.009,10,96),polished,wheel);
+ lip.rotation.y=Math.PI/2;lip.position.x=.094;
+ // Four wide satin-silver MK2-style spokes with small recesses.
+ for(let i=0;i<4;i++){
+  const angle=Math.PI/4+i*Math.PI/2;
+  const group=new THREE.Group();group.rotation.x=angle;wheel.add(group);
+  const spoke=box(.097,0,.095,.022,.084,.148,silver,group);
+  spoke.rotation.x=-.055;
+  const recess=box(.111,0,.119,.002,.029,.072,dark,group);
+  recess.rotation.x=-.055;
+ }
+ const hub=cyl(.055,.035,silver,wheel);hub.rotation.z=Math.PI/2;hub.position.x=.113;
+ const cap=cyl(.027,.037,polished,wheel);cap.rotation.z=Math.PI/2;cap.position.x=.135;
+ for(let i=0;i<4;i++){
+  const a=i*Math.PI/2;const lug=cyl(.009,.012,bolt,wheel,16);lug.rotation.z=Math.PI/2;lug.position.set(.135,Math.cos(a)*.049,Math.sin(a)*.049);
+ }
+ for(let i=0;i<24;i++){
+  const a=i*Math.PI/12;const fastener=cyl(.0034,.008,bolt,wheel,8);fastener.rotation.z=Math.PI/2;fastener.position.set(.104,Math.cos(a)*.172,Math.sin(a)*.172);
+ }
+}
+const hubs=[];
+for(const front of [true,false])for(const side of [-1,1]){
+ const hub=new THREE.Group();hub.position.set(side*.755,.298,front?-1.355:1.355);root.add(hub);
+ const wheel=new THREE.Group();hub.add(wheel);
+ makeTyre(wheel);makeMK2(wheel,side);
+ // Low street stance with mild negative camber and near-flush ET, visually approximate.
+ hub.rotation.z=side*(front?-.022:-.032);
+ hubs.push(hub);
+}
+// Chuki-inspired side skirts, aligned to the shell's side sills.
+for(const side of [-1,1]){
+ const pts=[[-1.02,.195],[-.75,.17],[-.05,.16],[.75,.16],[1.08,.19]];
+ const p=pts.map(([z,y])=>[side*.79,z]);
+ shapedStrip(p,.235,.15,pearl);
+ tube([[side*.80,.17,-1.05],[side*.83,.145,-.8],[side*.83,.145,.75],[side*.80,.17,1.08]],.016,pearl);
+ // Nismo-style rear bumper corner pods, body-coloured with a dark lower edge.
+ const pod=box(side*.77,.235,2.05,.16,.135,.29,pearl);
+ pod.rotation.y=side*.14;
+ tube([[side*.69,.16,1.90],[side*.83,.15,2.03],[side*.83,.15,2.19]],.017,dark);
+}
+// 180SX Pignose-inspired lower lip adapted to OEM Silvia bumper. Intentionally an interpretation,
+// not a mechanically verified direct copy of a particular moulding.
+const lipPts=[[-.82,-2.00],[-.85,-2.105],[-.77,-2.19],[-.50,-2.24],[0,-2.25],[.50,-2.24],[.77,-2.19],[.85,-2.105],[.82,-2.00]];
+shapedStrip(lipPts,.215,.125,dark);
+tube(lipPts.map(([x,z])=>[x,.128,z]),.012,dark);
+// B-Wave / Pro Shop Wave-inspired rear wing, custom-made in the correct rear location.
+for(const side of [-1,1]){
+ const support=box(side*.48,.76,1.86,.065,.17,.13,dark);support.rotation.x=-.12;
+ const endplate=box(side*.69,.88,1.98,.027,.11,.33,pearl);endplate.rotation.x=-.07;
+}
+const wing=box(0,.91,1.98,1.41,.056,.34,pearl);wing.rotation.x=-.07;
+tube([[-.70,.89,2.14],[-.4,.89,2.15],[0,.89,2.16],[.4,.89,2.15],[.70,.89,2.14]],.016,dark);
+// Dual polished exhaust tips, exiting rear LEFT. The Silvia's +Z end is the rear.
+for(const x of [-.58,-.45]){
+ const pipe=cyl(.031,.18,polished);pipe.rotation.x=Math.PI/2;pipe.position.set(x,.235,2.25);
+ const darkBore=cyl(.024,.002,dark);darkBore.rotation.x=Math.PI/2;darkBore.position.set(x,.235,2.345);
+ const inner=cyl(.018,.003,mat('#080909'));inner.rotation.x=Math.PI/2;inner.position.set(x,.235,2.348);
+}
+// Recaro SR3-inspired seats: sculpted bucket backs, contrasting cloth centre, red shoulder badges.
+for(const side of [-1,1]){
+ const chair=new THREE.Group();chair.position.set(side*.34,.42,-.16);root.add(chair);
+ const back=box(0,.31,.12,.38,.62,.12,seatCloth,chair);back.rotation.x=-.13;
+ const insert=box(0,.31,.053,.24,.42,.008,mat('#373a40'),chair);insert.rotation.x=-.13;
+ box(0,.61,.043,.20,.035,.011,red,chair);
+ const cushion=box(0,-.07,-.12,.38,.11,.45,seatCloth,chair);
+ for(const s of [-1,1])box(s*.19,.26,.07,.085,.44,.15,seatCloth,chair);
+}
+// Accurate base shell supplied by the user; hide original wheels, brakes and exhaust so the new components cannot overlap.
+new GLTFLoader().load('./silvia-shell.glb',gltf=>{
+ const shell=gltf.scene;
+ shell.traverse(obj=>{
+  if(!obj.isMesh)return;
+  const n=Array.isArray(obj.material)?obj.material.map(m=>m.name||'').join(' ').toLowerCase():(obj.material?.name||'').toLowerCase();
+  if(/wheel_|brake_disc|exh_chrome/.test(n)){obj.visible=false;return;}
+  if(n==='body_paint'||n==='body_paint2'){
+   obj.material=pearl;
   }
- }
- for(let i=0;i<points.length-1;i++)for(let j=0;j<2;j++){
-  const a=i*3+j,b=a+3;indices.push(a,b,a+1,b,b+1,a+1);
- }
- const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(indices);geo.computeVertexNormals();
- g.add(new THREE.Mesh(geo,lipAeroMaterial));
- return g;
-}
-const loader=new GLTFLoader();
-let xr4Scene;
-
-for(const z of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
- const pivot=new THREE.Group();pivot.position.set(x,HUB_Y,z);wheelRoot.add(pivot);
- const factory=new THREE.Group(),aftermarket=new THREE.Group();aftermarket.position.x=-Math.sign(x)*.035;pivot.add(factory,aftermarket);
- wheelSets.push({x,z,pivot,factory,aftermarket,front:z===HUB_REAR});
-}
-
-// The car GLB combines all four wheels into each mesh. Divide each wheel mesh
-// into four individual geometries by triangle location so camber can rotate
-// each corner independently. Brake discs follow their corresponding hub too.
-function extractCorners(mesh,body){
- mesh.updateMatrixWorld(true);body.updateMatrixWorld(true);
- const transform=new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(mesh.matrixWorld);
- const geometry=mesh.geometry.clone();geometry.applyMatrix4(transform);
- // Expand to independent triangles so each corner has self-contained geometry.
- const nonIndexed=geometry.index?geometry.toNonIndexed():geometry;
- const pos=nonIndexed.getAttribute('position');
- const corners=wheelSets.map(()=>[]);
- for(let i=0;i<pos.count;i+=3){
-  const x=(pos.getX(i)+pos.getX(i+1)+pos.getX(i+2))/3;
-  const z=(pos.getZ(i)+pos.getZ(i+1)+pos.getZ(i+2))/3;
-  const k=wheelSets.findIndex(w=>(w.x>0)===(x>0)&&(w.z>0)===(z>0));
-  if(k>=0)corners[k].push(i,i+1,i+2);
- }
- for(let k=0;k<4;k++){
-  if(!corners[k].length)continue;
-  const w=wheelSets[k];const g=nonIndexed.clone();g.setIndex(corners[k]);
-  g.translate(-w.x,-HUB_Y,-w.z);
-  const part=new THREE.Mesh(g,mesh.material);
-  part.name=mesh.material?.name||mesh.name;
-  if(part.name.toLowerCase().includes("wheel_tire"))factoryTireParts.push(part);
-  // Tires, rims and brake components are all moved with their own hub.
-  w.factory.add(part);
- }
- geometry.dispose();if(nonIndexed!==geometry)nonIndexed.dispose();mesh.visible=false;
-}
-
-// All SSR rims in the supplied collection are authored around the X axle.
-// MK2/MK3 decorative centres use a Z axle and are rotated to match the lips.
-// A wheel is assembled at its own origin before placement at each actual hub.
-// XR4 parts are independently centred, and their two different source axes
-// are normalised to the car's X wheel axle before placing on each hub.
-function makeSSR(type,side){
- const wheel=new THREE.Group();
- xr4Scene.updateMatrixWorld(true);
- xr4Scene.traverse(o=>{
-  if(!o.isMesh)return;
-  const n=o.name.toLowerCase();
-  const g=o.geometry.clone();g.applyMatrix4(o.matrixWorld);
-  const bounds=new THREE.Box3().setFromBufferAttribute(g.getAttribute('position'));
-  const c=bounds.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);
-  // Lip and bolts are built around Z; spokes/lugs around X.
-  if(n.includes('xr4 lip'))g.rotateY(Math.PI/2);
-  // Scale the 2.65-unit rim diameter to 0.54m.
-  g.scale(.205,.205,.205);
-  // Keep lip at outer side; face just behind the outer rim edge.
-  if(n.includes('spokes')||n.includes('lugs'))g.translate(side*.04,0,0);
-  const original=Array.isArray(o.material)?o.material[0]:o.material;
-  const material=n.includes('spokes')?faceMaterial:
-    original ? original.clone() : (n.includes('chrome')?lipMaterial:innerMaterial);
-  if(material!==faceMaterial){material.metalness=Math.max(material.metalness||0,.78);material.roughness=Math.min(material.roughness||.3,.22);}
-  wheel.add(new THREE.Mesh(g,material));
  });
- if(side<0)wheel.rotation.y=Math.PI;
- return wheel;
-}
-function applySetup(){
- faceMaterial.color.set(config.face);
- bodyRoot.position.y=-config.ride/1000;
- if(fittedLip)fittedLip.visible=config.lip==='on';
- for(const w of wheelSets){
-  const angle=THREE.MathUtils.degToRad(w.front?config.front:config.rear);
-  // Negative camber means tops inward, on both sides.
-  w.pivot.rotation.z=-Math.sign(w.x)*angle;
-  // ET is positive inward. Keep the factory +20 reference at its current hub position.
-  // Apply offset to the entire corner assembly so camber still pivots about its hub.
-  const et=w.front?config.frontET:config.rearET;
-  w.pivot.position.x=w.x+Math.sign(w.x)*(20-et)/1000;
-  w.factory.visible=config.wheel==='stock';
-  for(const part of w.factory.children){
-   const n=part.name.toLowerCase();
-   // All original tyre meshes are hidden. Only original factory rims remain in stock mode.
-   part.visible=config.wheel==='stock'&&!n.includes('wheel_tire');
-  }
-  w.aftermarket.visible=true;
-  while(w.aftermarket.children.length){
-   const child=w.aftermarket.children[0];w.aftermarket.remove(child);
-   child.traverse(obj=>{if(obj.geometry)obj.geometry.dispose()});
-  }
-  if(config.wheel!=='stock'&&xr4Scene)w.aftermarket.add(makeSSR(config.wheel,Math.sign(w.x)));
-  // Every setup uses our own tyre geometry, including factory wheels.
-  w.aftermarket.add(makeTyre());
- }
- $('rideOut').textContent=`−${config.ride} mm`;
- $('frontOut').textContent=`${Number(config.front).toFixed(1)}°`;
- $('rearOut').textContent=`${Number(config.rear).toFixed(1)}°`;
- $('frontETOut').textContent=`ET ${config.frontET>=0?'+':''}${config.frontET}`;
- $('rearETOut').textContent=`ET ${config.rearET>=0?'+':''}${config.rearET}`;
-}
-for(const id of ['wheel','face','ride','front','rear','frontET','rearET','lip'])$(id).addEventListener('input',e=>{
- config[id]=['ride','front','rear','frontET','rearET'].includes(id)?Number(e.target.value):e.target.value;
- applySetup();
-});
-$('reset').onclick=()=>{
- Object.assign(config,{wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,frontET:20,rearET:20,lip:'off'});
- for(const id of ['wheel','face','ride','front','rear','frontET','rearET','lip'])$(id).value=config[id];applySetup();
-};
-function panel(open){$('panel').classList.toggle('hidden',!open);document.body.classList.toggle('panel-open',open);$('toggle').setAttribute('aria-expanded',String(open))}
-$('toggle').onclick=()=>panel(true);$('close').onclick=()=>panel(false);panel(innerWidth>640);
-
-async function load(){
- try{
-  const [car,ssr]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_longchamp_xr4.glb')]);
-  const lipGLB=await loader.loadAsync('./original-180sx-front-section.glb');
-  fittedLip=lipGLB.scene;
-  fittedLip.traverse(m=>{if(m.isMesh){m.material=new THREE.MeshStandardMaterial({color:0x292b2d,metalness:.08,roughness:.78,side:THREE.DoubleSide});}});
-  // Extracted original 180SX front-bumper triangles are aligned to the Silvia in preprocessing.
-  bodyRoot.add(fittedLip);
-  xr4Scene=ssr.scene;
-  const body=car.scene;body.updateMatrixWorld(true);
-  const wheels=[];
-  body.traverse(mesh=>{
-   if(!mesh.isMesh)return;
-   const mats=Array.isArray(mesh.material)?mesh.material:[mesh.material];
-   const names=mats.map(m=>(m?.name||'').toLowerCase());
-   if(names.some(n=>n.startsWith('wheel_')||n.startsWith('brake_'))){wheels.push(mesh);return}
-   const paint=m=>{
-    if(!m||!['body_paint','body_paint2'].includes(m.name))return m;
-    const copy=m.clone();copy.color.set('#eae8df');copy.metalness=.3;copy.roughness=.26;return copy;
-   };
-   mesh.material=Array.isArray(mesh.material)?mesh.material.map(paint):paint(mesh.material);
-  });
-  for(const mesh of wheels)extractCorners(mesh,body);
-  bodyRoot.add(body);
-  // Centre on body dimensions, not wheel bounds. Both body and wheel groups
-  // receive the same root transform and remain correctly aligned.
-  const box=new THREE.Box3().setFromObject(body);
-  const center=box.getCenter(new THREE.Vector3());
-  root.position.set(-center.x,-center.y,-center.z);
-  camera.position.set(5.2,2.6,6.4);orbit.target.set(0,0,0);orbit.update();
-  applySetup();$('loading').remove();
- }catch(err){console.error(err);$('loading').textContent='Could not load model files. Check the GLBs are in the same folder.'}
-}
-load();
-function resize(){const el=$('viewer'),w=Math.max(1,el.clientWidth),h=Math.max(1,el.clientHeight);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false)}
-new ResizeObserver(resize).observe($('viewer'));resize();
-renderer.setAnimationLoop(()=>{orbit.update();renderer.render(scene,camera)});
+ root.add(shell);
+ document.querySelector('#loading').remove();
+},undefined,err=>{console.error(err);document.querySelector('#loading').textContent='Could not load Silvia shell. Check that silvia-shell.glb was uploaded.'});
+function resize(){const el=document.querySelector('#stage');const w=el.clientWidth,h=el.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false)}
+new ResizeObserver(resize).observe(document.querySelector('#stage'));resize();
+renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera)});
