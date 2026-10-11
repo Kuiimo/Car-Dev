@@ -1,30 +1,15 @@
-S13 STUDIO — Interactive Silvia configurator
-=============================================
-Files: index.html, styles.css, app.js
+PS13 / THE SILVIA — VISUAL REDESIGN
 
-This is a working interactive browser-based 3D prototype. It uses an original,
-procedurally generated PS13-inspired model. It is NOT a dimensionally accurate
-scan or an OEM-grade 3D model of a 1992 Silvia. Real-world fitment cannot be
-validated with this preview.
+This is a completely new, editorial-style website for a pearl-white 1992 Nissan Silvia PS13.
+It intentionally has NO modification controls. Drag to rotate; scroll/pinch to zoom.
 
-Includes:
-- Drag to rotate, zoom, front/side/rear/3/4 camera presets
-- Pearl White factory starting colour and five alternate paints
-- Wheel designs and finishes, visual lowering, lips, skirts, spoilers
-- Window tint, headlight colour, caliper colours
-- Save build in this browser and export build settings as JSON
-- Responsive desktop and mobile design
+IMPORTANT: The vehicle is a more detailed custom procedural 3D approximation, NOT a photogrammetry scan or precision factory CAD. It should not be used for real-world part fitment.
 
-PUBLISH ON GITHUB PAGES:
-1. Create a new GitHub repository (e.g. s13-studio).
-2. Upload index.html, styles.css and app.js to its root.
-3. In Settings > Pages, select Deploy from a branch, main, / (root).
-4. Visit the published GitHub Pages URL.
+DEPLOY TO YOUR GITHUB REPOSITORY:
+1. Open https://github.com/kuiimo/car-dev
+2. Upload index.html, styles.css, and app.js to the repository root, replacing the old files.
+3. Commit changes. GitHub Pages should update automatically.
+4. Visit https://kuiimo.github.io/car-dev/ and hard-refresh if you see the old design.
 
-The site needs an internet connection to load Three.js from esm.sh.
-For the best experience, open through GitHub Pages or a local HTTP server;
-opening index.html directly from disk may be blocked by browser security.
-
-A true accurate replica of your own car would require an appropriately licensed
-high-quality PS13 3D model, photogrammetry, or a professional modelling pass.
-The 3D model in this demo is a deliberately simplified proof of concept.
+The site uses Three.js from esm.sh and Google Fonts, so an internet connection is required.
+No Supabase or backend required.

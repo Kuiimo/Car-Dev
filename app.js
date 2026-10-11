@@ -1,28 +1,116 @@
-import * as T from 'https://esm.sh/three@0.160.1';
+import * as THREE from 'https://esm.sh/three@0.160.1';
 import {OrbitControls} from 'https://esm.sh/three@0.160.1/examples/jsm/controls/OrbitControls.js';
-const $=s=>document.querySelector(s),defaults={paint:'pearl',wheels:'stock',wheelColor:'silver',ride:0,spoiler:'stock',front:'stock',skirts:false,tint:'factory',lights:'stock',calipers:'black'};let b={...defaults},tab='paint';
-const opts={paint:{pearl:'Pearl White',black:'Super Black',red:'Super Red',silver:'Silver',blue:'Midnight Blue',champagne:'Champagne'},wheels:{stock:'Factory 15″',mesh:'Mesh 17″',five:'5-spoke 17″',deep:'Deep-dish 18″'},wheelColor:{silver:'Silver',black:'Black',bronze:'Bronze'},spoiler:{stock:'Factory lip',none:'Delete',duck:'Ducktail',wing:'GT wing'},front:{stock:'Stock bumper',lip:'Front lip',aero:'Aero splitter'},tint:{factory:'Factory glass',light:'Light tint',dark:'Dark tint'},lights:{stock:'Stock',smoked:'Smoked'},calipers:{black:'Black',red:'Red',teal:'Teal'}};
-const colors={pearl:'#e8e8dc',black:'#111820',red:'#b72a34',silver:'#a6b1b8',blue:'#233d69',champagne:'#b2a28b'};
-const scene=new T.Scene();scene.fog=new T.Fog('#0c1b29',13,26);const camera=new T.PerspectiveCamera(38,1,.1,100);camera.position.set(-6,3.3,7.5);const renderer=new T.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.55;$('#scene').append(renderer.domElement);const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(0,.83,0);orbit.enableDamping=true;orbit.minDistance=4;orbit.maxDistance=13;orbit.maxPolarAngle=Math.PI*.49;orbit.update();scene.add(new T.HemisphereLight(0xd5eeff,0x19212d,2.4));for(const [c,i,x,y,z] of [[0xffffff,3.6,-3,8,6],[0x72c9ef,2.2,4,5,-6]]){const l=new T.DirectionalLight(c,i);l.position.set(x,y,z);scene.add(l)}const floor=new T.Mesh(new T.PlaneGeometry(100,100),new T.MeshStandardMaterial({color:0x152431,roughness:.9}));floor.rotation.x=-Math.PI/2;floor.position.y=-.06;scene.add(floor);const grid=new T.GridHelper(20,40,0x28455a,0x20394a);grid.position.y=-.05;grid.material.opacity=.38;grid.material.transparent=true;scene.add(grid);const car=new T.Group();scene.add(car);
-const mat=(c,metal=.12,rough=.36)=>new T.MeshStandardMaterial({color:c,metalness:metal,roughness:rough});
-function box(g,w,h,d,m,x,y,z){const o=new T.Mesh(new T.BoxGeometry(w,h,d),m);o.position.set(x,y,z);g.add(o);return o}
-function poly(g,points,depth,m,x=0,y=0,z=0){const s=new T.Shape();points.forEach(([a,b],i)=>i?s.lineTo(a,b):s.moveTo(a,b));s.closePath();const o=new T.Mesh(new T.ExtrudeGeometry(s,{depth,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.02,bevelThickness:.02}),m);o.position.set(x,y,z);g.add(o);return o}
-function cyl(g,r,d,m,x,y,z){const o=new T.Mesh(new T.CylinderGeometry(r,r,d,32),m);o.rotation.x=Math.PI/2;o.position.set(x,y,z);g.add(o);return o}
-function draw(){while(car.children.length){const c=car.children[0];car.remove(c);c.traverse(o=>o.geometry?.dispose?.())}const g=new T.Group();g.position.y=-b.ride*.008;car.add(g);const paint=mat(colors[b.paint],.35,.27),dark=mat('#121820',.15,.5),chrome=mat('#c5d2d9',.8,.22),rubber=mat('#101419',0,.9),glass=mat(b.tint==='dark'?'#070d13':b.tint==='light'?'#29414d':'#172d3c',.24,.16),red=mat('#b51a28'),amber=mat('#dc8d39');
-// Low three-box silhouette: PS13-inspired coupe, front points toward negative X.
-poly(g,[[-2.23,.54],[-2.15,.93],[-1.77,1.03],[1.83,1.03],[2.18,.91],[2.25,.55]],1.73,paint,0,0,-.865);
-poly(g,[[-.98,1.02],[-.49,1.62],[.51,1.64],[1.20,1.03]],1.53,paint,0,0,-.765);
-for(const z of [-.79,.79]){poly(g,[[-.84,1.08],[-.44,1.52],[-.08,1.53],[-.08,1.08]],.012,glass,0,0,z);poly(g,[[.015,1.08],[.015,1.53],[.47,1.54],[1.04,1.08]],.012,glass,0,0,z);box(g,.045,.47,.04,dark,-.04,1.32,z);box(g,.19,.035,.035,dark,.42,1.015,z*1.09);box(g,.03,.37,.022,dark,.88,.79,z*1.09);box(g,.24,.13,.17,paint,-.78,1.12,z*1.14);box(g,2.1,.08,.065,dark,-.08,.51,z*1.08)}
-poly(g,[[-.98,1.04],[-.48,1.56],[-.47,1.56],[-.91,1.04]],1.4,glass,0,0,-.70);poly(g,[[.52,1.56],[1.20,1.04],[1.12,1.04],[.47,1.56]],1.4,glass,0,0,-.70);
-for(const z of [-.59,.59]){box(g,.65,.012,.018,chrome,-1.55,1.038,z);box(g,.28,.09,.45,mat(b.lights==='smoked'?'#31363b':'#d8e1db'),-2.244,.83,z*.98);box(g,.055,.12,.24,amber,-2.257,.78,z*1.43);box(g,.055,.18,.62,red,2.257,.85,z*.79);box(g,.035,.18,.12,amber,2.27,.85,z*1.41)}
-box(g,.045,.23,.6,dark,-2.258,.78,0);for(const x of [-2.26,2.26]){box(g,.08,.22,1.67,paint,x,.59,0);box(g,.09,.105,.42,chrome,x*1.024,.65,0);box(g,.05,.075,1.63,dark,x*1.025,.51,0)}
-if(b.front!=='stock'){box(g,b.front==='aero'?.56:.36,.065,1.84,dark,-2.23,.40,0);if(b.front==='aero')for(const z of [-.82,.82])box(g,.3,.17,.045,dark,-2.17,.46,z)}if(b.skirts)for(const z of [-.92,.92])box(g,2.3,.10,.15,paint,0,.42,z);
-if(b.spoiler==='stock')box(g,.33,.065,1.59,paint,2.03,1.058,0);if(b.spoiler==='duck')poly(g,[[1.73,1.04],[2.15,1.07],[2.24,1.30],[2.17,1.26],[2.03,1.12]],1.65,paint,0,0,-.825);if(b.spoiler==='wing'){for(const z of [-.57,.57])box(g,.10,.39,.06,dark,1.88,1.24,z);box(g,.54,.07,1.96,dark,1.91,1.46,0)}
-const rim=mat({silver:'#c6d1d7',black:'#22272e',bronze:'#9c7750'}[b.wheelColor],.85,.24),brake=mat({black:'#1b242d',red:'#d42b32',teal:'#2bd9c6'}[b.calipers]),r=b.wheels==='stock'?.305:b.wheels==='deep'?.355:.335;for(const x of [-1.4,1.4])for(const side of [-1,1]){const z=side*.895;cyl(g,r+.075,.23,rubber,x,r+.03,z);cyl(g,r,.245,dark,x,r+.03,z+side*.007);cyl(g,r*.83,.255,rim,x,r+.03,z+side*.018);cyl(g,r*.65,.27,brake,x,r+.03,z+side*.025);const n=b.wheels==='mesh'?12:b.wheels==='stock'?6:5;for(let i=0;i<n;i++){const a=i*Math.PI*2/n;const s=box(g,r*.14,r*.74,.038,rim,x+Math.sin(a)*r*.38,r+.03+Math.cos(a)*r*.38,z+side*.156);s.rotation.z=-a}cyl(g,r*.14,.31,chrome,x,r+.03,z+side*.17);if(b.wheels==='deep')cyl(g,r*.87,.025,chrome,x,r+.03,z+side*.19)}
+
+// Bespoke, lightweight PS13-inspired model: smooth lofted bodywork, angular glasshouse,
+// separate lights, trim, arch detailing, multi-piece wheels. This is NOT a scanned CAD model.
+const mount=document.getElementById('viewer');
+const scene=new THREE.Scene();scene.background=new THREE.Color('#f3f1eb');
+const camera=new THREE.PerspectiveCamera(33,1,.1,100);camera.position.set(-8.4,3.5,7.6);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.35;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;mount.appendChild(renderer.domElement);
+const orbit=new OrbitControls(camera,renderer.domElement);orbit.enableDamping=true;orbit.dampingFactor=.055;orbit.target.set(0,.87,0);orbit.minDistance=5.2;orbit.maxDistance=15;orbit.minPolarAngle=.13;orbit.maxPolarAngle=Math.PI*.49;orbit.enablePan=false;orbit.update();
+scene.add(new THREE.HemisphereLight(0xffffff,0x90938c,2.7));
+const sunlight=new THREE.DirectionalLight(0xffffff,3.5);sunlight.position.set(-4,9,7);sunlight.castShadow=true;sunlight.shadow.mapSize.set(2048,2048);sunlight.shadow.camera.left=-7;sunlight.shadow.camera.right=7;sunlight.shadow.camera.top=7;sunlight.shadow.camera.bottom=-7;sunlight.shadow.bias=-.0002;scene.add(sunlight);
+const fill=new THREE.DirectionalLight(0xc3d2e5,1.4);fill.position.set(4,4,-6);scene.add(fill);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:'#f3f1eb',roughness:.88}));floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;floor.position.y=-.025;scene.add(floor);
+const contact=new THREE.Mesh(new THREE.CircleGeometry(3.2,80),new THREE.MeshBasicMaterial({color:'#6e6b62',transparent:true,opacity:.085,depthWrite:false}));contact.rotation.x=-Math.PI/2;contact.scale.set(1,.47,1);contact.position.y=-.015;scene.add(contact);
+const car=new THREE.Group();scene.add(car);
+const material=(color,metalness=.1,roughness=.4)=>new THREE.MeshStandardMaterial({color,metalness,roughness,side:THREE.DoubleSide});
+const pearl=material('#e7e6dc',.38,.22),paintShade=material('#d7d9d2',.34,.28),black=material('#15191b',.2,.57),softBlack=material('#24292c',.25,.56),rubber=material('#191a1c',.03,.9),silver=material('#b5b9ba',.86,.23),glass=material('#253b44',.36,.17),glassHighlight=material('#41565c',.38,.18),red=material('#a71b23',.18,.26),amber=material('#e39c47',.12,.26),lamp=material('#cbd7d6',.27,.19),interior=material('#22282a',.04,.9);
+function mesh(g,m,parent=car){const o=new THREE.Mesh(g,m);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o}
+function block(x,y,z,w,h,d,m,parent=car){const o=mesh(new THREE.BoxGeometry(w,h,d),m,parent);o.position.set(x,y,z);return o}
+function poly(points,m,parent=car){const geom=new THREE.BufferGeometry(),verts=[];for(let i=1;i<points.length-1;i++)verts.push(...points[0],...points[i],...points[i+1]);geom.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geom.computeVertexNormals();return mesh(geom,m,parent)}
+function quad(a,b,c,d,m,parent=car){return poly([a,b,c,d],m,parent)}
+function strip(points,m,parent=car){for(let i=0;i<points.length-1;i++)quad(...points[i],...points[i+1],m,parent)}
+function tube(points,r,m,parent=car){const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));return mesh(new THREE.TubeGeometry(curve,Math.max(8,points.length*6),r,6,false),m,parent)}
+function panelOutline(points,r=.008,m=softBlack){tube([...points,points[0]],r,m)}
+function loft(rings,m){const v=[],indices=[];for(const ring of rings)for(const pt of ring)v.push(...pt);const n=rings[0].length;for(let i=0;i<rings.length-1;i++)for(let j=0;j<n;j++){const a=i*n+j,b=i*n+(j+1)%n,c=(i+1)*n+j,d=(i+1)*n+(j+1)%n;indices.push(a,b,c,b,d,c)}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setIndex(indices);g.computeVertexNormals();return mesh(g,m)}
+// X axis runs from nose (-X) to tail (+X). Real PS13 length/width proportions approximated.
+// Upper body is contoured with multiple cross sections, rather than a box.
+const sections=[[-2.29,.66,.76,.89],[-2.15,.72,.84,1.01],[-1.83,.75,.88,1.06],[-1.45,.76,.9,1.065],[-.95,.76,.91,1.06],[-.25,.77,.92,1.07],[.65,.76,.91,1.065],[1.35,.75,.9,1.05],[1.94,.74,.87,1.03],[2.23,.69,.81,.94],[2.31,.62,.77,.86]];
+const rings=sections.map(([x,half,shoulder,top])=>[[x,.47,-half*.97],[x,.45,-half],[x,.56,-shoulder],[x,.85,-shoulder],[x,top,-shoulder*.92],[x,top,-shoulder*.55],[x,top,0],[x,top,shoulder*.55],[x,top,shoulder*.92],[x,.85,shoulder],[x,.56,shoulder],[x,.45,half],[x,.47,half*.97]]);
+loft(rings,pearl);
+// Wheel arches: dark wheel well surrounds, recessed beneath the smooth outer body.
+for(const x of [-1.38,1.39])for(const side of [-1,1]){
+ const z=side*.89;const arch=[];for(let i=0;i<=24;i++){const a=Math.PI*i/24;arch.push([x-.45*Math.cos(a),.40+.46*Math.sin(a),z+side*.024])}tube(arch,.027,paintShade);
 }
-function option(field,key,label,swatch){return `<button class="option ${b[field]===key?'active':''}" data-field="${field}" data-value="${key}">${swatch?`<span class="swatch" style="background:${swatch}"></span>`:''}${label}</button>`}
-function group(title,items,desc=''){return `<div class="group"><h3>${title}</h3>${desc?`<p>${desc}</p>`:''}<div class="option-grid">${items}</div></div>`}
-function list(field,swatches){return Object.entries(opts[field]).map(([k,v])=>option(field,k,v,swatches?.[k])).join('')}
-function controls(){let html='';if(tab==='paint')html=group('Body colour',list('paint',colors),'Factory Pearl White is selected by default.');if(tab==='wheels')html=group('Wheel design',list('wheels'))+group('Wheel finish',list('wheelColor',{silver:'#becbd2',black:'#22262b',bronze:'#987047'}));if(tab==='stance')html=`<div class="group"><h3>Ride height</h3><div class="range-row"><span>Factory height</span><strong>${b.ride===0?'Stock':`${b.ride} mm lower (visual)`}</strong></div><input id="rideSlider" type="range" min="0" max="60" step="5" value="${b.ride}"><p>Illustrative lowering effect; wheel geometry and fitment are not mechanically simulated.</p></div>`;if(tab==='body')html=group('Rear spoiler',list('spoiler'))+group('Front bumper',list('front'))+group('Side skirts',option('skirts',false,'Factory sills')+option('skirts',true,'Aero skirts'));if(tab==='details')html=group('Window tint',list('tint'))+group('Headlights',list('lights'))+group('Brake calipers',list('calipers'));$('#controls').innerHTML=html;document.querySelectorAll('#controls [data-field]').forEach(el=>el.onclick=()=>{b[el.dataset.field]=el.dataset.value==='true'?true:el.dataset.value==='false'?false:el.dataset.value;update()});$('#rideSlider')?.addEventListener('input',e=>{b.ride=Number(e.target.value);update()})}
-function summary(){const changes=Object.keys(defaults).filter(k=>b[k]!==defaults[k]);$('#modsCount').textContent=`${changes.length} mod${changes.length===1?'':'s'}`;$('#summary').innerHTML=[['Base','1992 Silvia K’s (PS13)'],['Paint',opts.paint[b.paint]],['Wheels',opts.wheels[b.wheels]],['Ride height',b.ride?`−${b.ride} mm (visual)`:'Factory'],['Spoiler',opts.spoiler[b.spoiler]],['Front',opts.front[b.front]],['Skirts',b.skirts?'Aero':'Factory'],['Tint',opts.tint[b.tint]]].map(([k,v])=>`<div class="summary-line"><span>${k}</span><b>${v}</b></div>`).join('')}
-function update(){draw();controls();summary()}document.querySelectorAll('[data-tab]').forEach(el=>el.onclick=()=>{tab=el.dataset.tab;document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('active',x===el));controls()});const views={front:[-8,2.5,0],side:[0,2.5,8],rear:[8,2.5,0],three:[-6,3.1,7]};document.querySelectorAll('[data-view]').forEach(el=>el.onclick=()=>{camera.position.set(...views[el.dataset.view]);orbit.update();document.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('selected',x===el))});$('#resetBtn').onclick=()=>{b={...defaults};update()};function download(filename,content){const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}$('#saveBtn').onclick=()=>{localStorage.setItem('s13-studio-build',JSON.stringify(b));$('#saveBtn').textContent='✓ Saved';setTimeout(()=>$('#saveBtn').textContent='Save build',1800)};$('#exportBtn').onclick=()=>download('my-1992-silvia-build.json',JSON.stringify({vehicle:'1992 Nissan Silvia K’s PS13',build:b,notes:'Illustrative visual configurator; verify actual part fitment.'},null,2));try{const saved=JSON.parse(localStorage.getItem('s13-studio-build'));if(saved&&typeof saved==='object')b={...defaults,...saved}}catch{}update();$('#loading')?.remove();function resize(){const el=$('#scene');camera.aspect=el.clientWidth/el.clientHeight;camera.updateProjectionMatrix();renderer.setSize(el.clientWidth,el.clientHeight,false)}new ResizeObserver(resize).observe($('#scene'));resize();renderer.setAnimationLoop(()=>{orbit.update();renderer.render(scene,camera)});
+// Coupe greenhouse: a low roof with distinct A/B/C pillars and a sloping rear window.
+const roofSections=[[-1.04,1.055,.77],[-.52,1.48,.70],[-.31,1.58,.69],[.46,1.58,.68],[.66,1.49,.70],[1.24,1.06,.79]];
+loft(roofSections.map(([x,y,z])=>[[x,y,-z],[x,y+.025,-z*.86],[x,y+.055,0],[x,y+.025,z*.86],[x,y,z]]),pearl);
+// Transparent-looking windscreen and rear screen with proper sloped planes.
+quad([-1.008,1.078,-.716],[-.493,1.49,-.665],[-.493,1.49,.665],[-1.008,1.078,.716],glass);
+quad([.672,1.487,-.655],[1.203,1.077,-.743],[1.203,1.077,.743],[.672,1.487,.655],glass);
+// Subtle reflective windshield band
+quad([-.67,1.352,-.65],[-.60,1.413,-.65],[-.60,1.413,.65],[-.67,1.352,.65],glassHighlight);
+for(const s of [-1,1]){
+ const z=s;
+ // side windows shaped into a true PS13 coupe profile
+ const front=[[-.91,1.079,.807*z],[-.474,1.49,.711*z],[-.079,1.50,.712*z],[-.079,1.08,.817*z]];
+ const rear=[[.002,1.50,.712*z],[.446,1.50,.713*z],[1.126,1.08,.816*z],[.002,1.08,.817*z]];
+ poly(front,glass);poly(rear,glass);
+ panelOutline(front,.010,black);panelOutline(rear,.010,black);
+ // body line below glass, belt line and door cut
+ tube([[-1.01,1.058,.836*z],[-.22,1.062,.869*z],[.65,1.06,.879*z],[1.52,1.044,.862*z]],.009,paintShade);
+ tube([[.62,1.052,.89*z],[.67,.84,.91*z],[.69,.53,.91*z]],.008,paintShade);
+ tube([[-.96,.57,.904*z],[-.10,.565,.94*z],[.71,.55,.927*z],[1.84,.54,.88*z]],.008,paintShade);
+ // door handle and mirror
+ block(.46,1.005,.91*z,.19,.025,.045,softBlack);
+ const mirror=mesh(new THREE.SphereGeometry(1,16,12),pearl);mirror.position.set(-.83,1.12,.98*z);mirror.scale.set(.17,.09,.11);
+ block(-.83,1.075,.89*z,.07,.05,.19,black);
+ // triangular quarter-window rear side panel
+ poly([[.58,1.44,.73*z],[.98,1.15,.80*z],[.71,1.16,.81*z]],glassHighlight);
+ // side repeater
+ block(-1.77,.84,.912*z,.115,.038,.023,amber);
+}
+// Sculpted front fascia, recessed rectangular fixed headlights (not 180SX popups)
+block(-2.314,.805,0,.025,.28,1.52,pearl);
+for(const s of [-1,1]){
+ block(-2.331,.865,.47*s,.022,.135,.58,black);
+ block(-2.345,.872,.47*s,.016,.106,.53,lamp);
+ block(-2.353,.87,.73*s,.019,.10,.095,amber);
+ block(-2.326,.665,.70*s,.023,.085,.16,amber);
+ // bumper corner vents
+ block(-2.345,.555,.64*s,.02,.095,.29,black);
+}
+block(-2.352,.793,0,.024,.07,.31,black);
+block(-2.349,.532,0,.025,.065,.76,black);
+block(-2.349,.635,0,.028,.10,.46,pearl);
+block(-2.365,.637,0,.018,.078,.31,material('#e3e3dd',.4,.2));
+// Front bumper lower lip and fog cutouts
+block(-2.30,.452,0,.17,.055,1.73,paintShade);
+// Rear tail lights are broad red bars with amber corners, distinct from front lamps.
+block(2.321,.817,0,.024,.235,1.66,black);
+for(const s of [-1,1]){
+ block(2.342,.824,.47*s,.018,.195,.62,red);
+ block(2.352,.829,.75*s,.018,.17,.09,amber);
+ block(2.36,.78,.32*s,.015,.035,.35,material('#c3c5be',.4,.2));
+}
+block(2.343,.825,0,.018,.185,.29,softBlack);
+block(2.35,.59,0,.04,.17,1.64,pearl);
+block(2.376,.61,0,.022,.085,.38,material('#deded8',.45,.3));
+block(2.355,.47,0,.14,.06,1.7,paintShade);
+// Stock low-profile boot lip
+block(2.02,1.034,0,.30,.047,1.61,pearl);
+// Exhaust
+const exhaust=mesh(new THREE.CylinderGeometry(.052,.052,.18,24),silver);exhaust.rotation.z=Math.PI/2;exhaust.position.set(2.40,.37,-.52);
+// Wheel assemblies: cylindrical tyres, inset barrel, brake disc, 6-spoke factory-style alloys.
+for(const x of [-1.38,1.39])for(const s of [-1,1]){
+ const y=.385,z=s*.91;
+ const tyre=mesh(new THREE.TorusGeometry(.333,.105,16,40),rubber);tyre.position.set(x,y,z);tyre.rotation.y=0;
+ // torus lies in XY plane; wheel axle along Z
+ const sidewall=mesh(new THREE.CylinderGeometry(.331,.331,.20,40),rubber);sidewall.rotation.x=Math.PI/2;sidewall.position.set(x,y,z);
+ const brake=mesh(new THREE.CylinderGeometry(.247,.247,.215,40),softBlack);brake.rotation.x=Math.PI/2;brake.position.set(x,y,z+s*.02);
+ const rim=mesh(new THREE.CylinderGeometry(.251,.251,.218,40),silver);rim.rotation.x=Math.PI/2;rim.position.set(x,y,z+s*.055);
+ const inset=mesh(new THREE.CylinderGeometry(.218,.218,.22,40),black);inset.rotation.x=Math.PI/2;inset.position.set(x,y,z+s*.07);
+ const spokeMaterial=material('#b7bcb9',.82,.25);
+ for(let i=0;i<6;i++){
+  const a=i*Math.PI/3;const spoke=block(x+Math.cos(a)*.116,y+Math.sin(a)*.116,z+s*.185,.205,.067,.03,spokeMaterial);spoke.rotation.z=a;
+ }
+ const hub=mesh(new THREE.CylinderGeometry(.061,.061,.245,20),silver);hub.rotation.x=Math.PI/2;hub.position.set(x,y,z+s*.07);
+ const outer=mesh(new THREE.TorusGeometry(.246,.019,10,40),silver);outer.position.set(x,y,z+s*.185);
+}
+function resize(){const w=mount.clientWidth,h=mount.clientHeight;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);if(w<650){camera.position.set(-10.8,4.2,9.3);orbit.target.set(0,.9,0);orbit.update()}}
+new ResizeObserver(resize).observe(mount);resize();
+// Gentle showroom rotation until visitor interacts.
+let touched=false;orbit.addEventListener('start',()=>{touched=true});
+const clock=new THREE.Clock();renderer.setAnimationLoop(()=>{const dt=Math.min(clock.getDelta(),.05);if(!touched)car.rotation.y+=dt*.11;orbit.update();renderer.render(scene,camera)});
+document.getElementById('loading')?.remove();
