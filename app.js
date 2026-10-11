@@ -38,13 +38,13 @@ function makeTyre(){
  // Revolved, CLOSED cross-section. Axis of the wheel is X; the tyre has real
  // tread thickness, shoulders and sidewalls, with a hole for the wheel face.
  const wheel=new THREE.Group();
- const half=.176,inner=.252,outer=.365;
+ const half=.118,inner=.248,outer=.334;
  const profile=[
   new THREE.Vector2(inner,-half),new THREE.Vector2(.276,-half),
   new THREE.Vector2(.326,-half+.014),new THREE.Vector2(.352,-half+.032),
-  new THREE.Vector2(outer,-half+.055),new THREE.Vector2(outer,half-.055),
-  new THREE.Vector2(.352,half-.032),new THREE.Vector2(.326,half-.014),
-  new THREE.Vector2(.276,half),new THREE.Vector2(inner,half),
+  new THREE.Vector2(outer,-half+.048),new THREE.Vector2(outer,half-.048),
+  new THREE.Vector2(.323,half-.032),new THREE.Vector2(.303,half-.014),
+  new THREE.Vector2(.273,half),new THREE.Vector2(inner,half),
   new THREE.Vector2(inner,-half)
  ];
  const geom=new THREE.LatheGeometry(profile,96);
@@ -53,8 +53,8 @@ function makeTyre(){
  const tyre=new THREE.Mesh(geom,tireMaterial);wheel.add(tyre);
  // Narrow sidewall relief rings, still with a clear centre.
  for(const side of [-1,1]){
-  const detail=new THREE.Mesh(new THREE.TorusGeometry(.306,.0028,8,96),tireSidewall);
-  detail.rotation.y=Math.PI/2;detail.position.x=side*.177;wheel.add(detail);
+  const detail=new THREE.Mesh(new THREE.TorusGeometry(.288,.0028,8,96),tireSidewall);
+  detail.rotation.y=Math.PI/2;detail.position.x=side*.119;wheel.add(detail);
  }
  return wheel;
 }
@@ -83,7 +83,7 @@ let xr4Scene;
 
 for(const z of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
  const pivot=new THREE.Group();pivot.position.set(x,HUB_Y,z);wheelRoot.add(pivot);
- const factory=new THREE.Group(),aftermarket=new THREE.Group();pivot.add(factory,aftermarket);
+ const factory=new THREE.Group(),aftermarket=new THREE.Group();aftermarket.position.x=-Math.sign(x)*.035;pivot.add(factory,aftermarket);
  wheelSets.push({x,z,pivot,factory,aftermarket,front:z===HUB_REAR});
 }
 
