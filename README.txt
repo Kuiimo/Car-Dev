@@ -1,8 +1,1 @@
-S13 SSR Wheel Studio
-
-Upload all five files to the ROOT of github.com/kuiimo/car-dev (replace old files).
-Enable GitHub Pages on main / (root). Open https://kuiimo.github.io/car-dev/
-
-Includes the user-provided Silvia and SSR collection GLBs.
-SSR MK1/MK2/MK3 are extracted from the supplied collection. Wheel size, hub placement, camber and lowering are visual approximations only; not a fitment tool.
-The supplied car has combined stock wheel geometry, so front/rear camber visualization is applied to the replacement SSR wheels.
+S13 repaired viewer v3. Original Silvia model stays upright in Y-up coordinates. Factory tires remain when SSR rims are selected. Camber pivots use Y-up and ride height lowers body relative to wheel hubs. Visual alignment is approximate and has not been browser-verified. Upload all six website files to GitHub Pages root.

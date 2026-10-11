@@ -18,12 +18,13 @@ for(const [color,power,x,y,z] of [[0xffffff,3.2,-5,9,8],[0xdcecff,2.1,7,4,-7]]){
  const light=new THREE.DirectionalLight(color,power);light.position.set(x,y,z);scene.add(light);
 }
 const config={wheel:'stock',face:'#c0c4c8',ride:0,front:0,rear:0,lip:'off'};
-const root=new THREE.Group();root.rotation.x=-Math.PI/2;scene.add(root);
+const root=new THREE.Group();scene.add(root);
 let lipObject=null;
 const bodyRoot=new THREE.Group();root.add(bodyRoot);
 const wheelRoot=new THREE.Group();root.add(wheelRoot);
 const wheelSets=[];
-const HUB_X=.735, HUB_Z=.300, HUB_FRONT=-1.236, HUB_REAR=1.244;
+const factoryTireParts=[];
+const HUB_X=.735, HUB_Y=.300, HUB_FRONT=-1.236, HUB_REAR=1.244;
 const lipMaterial=new THREE.MeshStandardMaterial({color:0xe6e8eb,metalness:.95,roughness:.14});
 const innerMaterial=new THREE.MeshStandardMaterial({color:0xb9bec4,metalness:.75,roughness:.27});
 const boltMaterial=new THREE.MeshStandardMaterial({color:0xd3d7dc,metalness:.9,roughness:.21});
@@ -32,10 +33,10 @@ const tireMaterial=new THREE.MeshStandardMaterial({color:0x17191c,roughness:.94}
 const loader=new GLTFLoader();
 let ssrScene;
 
-for(const y of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
- const pivot=new THREE.Group();pivot.position.set(x,y,HUB_Z);wheelRoot.add(pivot);
+for(const z of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
+ const pivot=new THREE.Group();pivot.position.set(x,HUB_Y,z);wheelRoot.add(pivot);
  const factory=new THREE.Group(),aftermarket=new THREE.Group();pivot.add(factory,aftermarket);
- wheelSets.push({x,y,pivot,factory,aftermarket,front:y===HUB_FRONT});
+ wheelSets.push({x,z,pivot,factory,aftermarket,front:z===HUB_FRONT});
 }
 
 // The car GLB combines all four wheels into each mesh. Divide each wheel mesh
@@ -45,24 +46,27 @@ function extractCorners(mesh,body){
  mesh.updateMatrixWorld(true);body.updateMatrixWorld(true);
  const transform=new THREE.Matrix4().copy(body.matrixWorld).invert().multiply(mesh.matrixWorld);
  const geometry=mesh.geometry.clone();geometry.applyMatrix4(transform);
- const pos=geometry.getAttribute('position');
- const index=geometry.getIndex();const n=index?index.count:pos.count;
- const buckets=wheelSets.map(()=>[]);
- for(let i=0;i<n;i+=3){
-  const a=index?index.getX(i):i,b=index?index.getX(i+1):i+1,c=index?index.getX(i+2):i+2;
-  const x=(pos.getX(a)+pos.getX(b)+pos.getX(c))/3;
-  const y=(pos.getY(a)+pos.getY(b)+pos.getY(c))/3;
-  const corner=wheelSets.findIndex(w=>(w.x>0)===(x>0)&&(w.y>0)===(y>0));
-  if(corner>=0)buckets[corner].push(a,b,c);
+ // Expand to independent triangles so each corner has self-contained geometry.
+ const nonIndexed=geometry.index?geometry.toNonIndexed():geometry;
+ const pos=nonIndexed.getAttribute('position');
+ const corners=wheelSets.map(()=>[]);
+ for(let i=0;i<pos.count;i+=3){
+  const x=(pos.getX(i)+pos.getX(i+1)+pos.getX(i+2))/3;
+  const z=(pos.getZ(i)+pos.getZ(i+1)+pos.getZ(i+2))/3;
+  const k=wheelSets.findIndex(w=>(w.x>0)===(x>0)&&(w.z>0)===(z>0));
+  if(k>=0)corners[k].push(i,i+1,i+2);
  }
- buckets.forEach((triangles,i)=>{
-  if(!triangles.length)return;
-  const g=geometry.clone();g.setIndex(triangles);
-  const w=wheelSets[i];g.translate(-w.x,-w.y,-HUB_Z);
+ for(let k=0;k<4;k++){
+  if(!corners[k].length)continue;
+  const w=wheelSets[k];const g=nonIndexed.clone();g.setIndex(corners[k]);
+  g.translate(-w.x,-HUB_Y,-w.z);
   const part=new THREE.Mesh(g,mesh.material);
-  part.name=mesh.name;w.factory.add(part);
- });
- geometry.dispose();mesh.visible=false;
+  part.name=mesh.material?.name||mesh.name;
+  if(part.name.toLowerCase().includes("wheel_tire"))factoryTireParts.push(part);
+  // Tires, rims and brake components are all moved with their own hub.
+  w.factory.add(part);
+ }
+ geometry.dispose();if(nonIndexed!==geometry)nonIndexed.dispose();mesh.visible=false;
 }
 
 // All SSR rims in the supplied collection are authored around the X axle.
@@ -70,52 +74,42 @@ function extractCorners(mesh,body){
 // A wheel is assembled at its own origin before placement at each actual hub.
 function makeSSR(type,side){
  const wheel=new THREE.Group();
- const matching=[];
+ const names={mk1:'mk1 spokes',mk2:'starshark lip.002',mk3:'starshark lip.004'};
  ssrScene.updateMatrixWorld(true);
  ssrScene.traverse(o=>{
   if(!o.isMesh)return;
   const name=o.name.toLowerCase();
-  const exactLip=name.startsWith(`${type} lip`);
-  const exactCenter=type==='mk1'?name.startsWith('mk1 spokes'):name.startsWith(`starshark lip.${type==='mk2'?'002':'004'}`);
-  if(exactLip||exactCenter)matching.push({o,name,center:exactCenter});
- });
- for(const {o,name,center} of matching){
+  const lip=name.startsWith(type+' lip');
+  const center=name.startsWith(names[type]);
+  if(!lip&&!center)return;
   const g=o.geometry.clone();g.applyMatrix4(o.matrixWorld);
-  // Meshes in the collection are already at local wheel origins (their scene
-  // transforms contain the offsets between displayed sample wheels).
+  // Each original sample is positioned elsewhere in the SSR collection.
+  // Recenter each individual component in its own local bounding box.
   const bounds=new THREE.Box3().setFromBufferAttribute(g.getAttribute('position'));
-  const middle=bounds.getCenter(new THREE.Vector3());
-  g.translate(-middle.x,-middle.y,-middle.z);
-  if(center&&type!=='mk1'){
-   g.rotateY(Math.PI/2);
-   g.scale(1,1.92,1.92);
-  }else if(center&&type==='mk1')g.scale(1,1.32,1.32);
-  // Scale lip diameter from 3.5 source units to 0.60 m and limit dish depth.
-  g.scale(.095,.172,.172);
-  if(center)g.translate(side*.055,0,0);
-  let material=faceMaterial;
-  if(name.includes('bolts'))material=boltMaterial;
-  else if(name.includes('chrome'))material=lipMaterial;
-  else if(name.includes('lip')&&!center)material=innerMaterial;
-  // Keep only the actual face colourable; lips and bolts are untouched.
-  const part=new THREE.Mesh(g,material);
-  wheel.add(part);
- }
- // Original parts face outwards on +X. Flip only the left-hand wheels.
+  const c=bounds.getCenter(new THREE.Vector3());g.translate(-c.x,-c.y,-c.z);
+  if(center&&type!=='mk1')g.rotateY(Math.PI/2);
+  // All assembled wheel parts have their axle along X, with a 3.5-unit lip diameter.
+  const radius=center?(type==='mk1'?1.27:.98):1.75;
+  const scale=.285/radius;
+  g.scale(scale*.55,scale,scale);
+  if(center)g.translate(side*.085,0,0);
+  const mat=name.includes('chrome')?lipMaterial:name.includes('bolts')?boltMaterial:
+            center&&(!name.includes('bolts'))?faceMaterial:innerMaterial;
+  wheel.add(new THREE.Mesh(g,mat));
+ });
  if(side<0)wheel.rotation.y=Math.PI;
- const tire=new THREE.Mesh(new THREE.TorusGeometry(.252,.050,16,64),tireMaterial);
- tire.rotation.y=Math.PI/2;wheel.add(tire);
  return wheel;
 }
 function applySetup(){
  faceMaterial.color.set(config.face);
- bodyRoot.position.z=-config.ride/1000;
+ bodyRoot.position.y=-config.ride/1000;
  if(lipObject)lipObject.visible=config.lip==='on';
  for(const w of wheelSets){
   const angle=THREE.MathUtils.degToRad(w.front?config.front:config.rear);
   // Negative camber means tops inward, on both sides.
-  w.pivot.rotation.y=Math.sign(w.x)*angle;
-  w.factory.visible=config.wheel==='stock';
+  w.pivot.rotation.z=-Math.sign(w.x)*angle;
+  w.factory.visible=true;
+  for(const part of w.factory.children){const n=part.name.toLowerCase();part.visible=config.wheel==='stock'||n.includes('wheel_tire')||n.includes('brake_')}
   w.aftermarket.visible=config.wheel!=='stock';
   while(w.aftermarket.children.length){
    const child=w.aftermarket.children[0];w.aftermarket.remove(child);
@@ -141,12 +135,7 @@ $('toggle').onclick=()=>panel(true);$('close').onclick=()=>panel(false);panel(in
 async function load(){
  try{
   const [car,ssr,lip]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_collection.glb'),loader.loadAsync('./180sx-front-lip.glb')]);
-  lipObject=lip.scene;
-  // Lip GLB was exported in a Y-up coordinate frame. Convert into car's Z-up frame.
-  lipObject.rotation.x=Math.PI/2;
-  // The lip's front-to-back axis in the source asset maps to the car's longitudinal Y.
-  lipObject.position.set(0,-.06,0);
-  bodyRoot.add(lipObject);
+  lipObject=lip.scene;bodyRoot.add(lipObject);
   ssrScene=ssr.scene;
   const body=car.scene;body.updateMatrixWorld(true);
   const wheels=[];
@@ -167,8 +156,7 @@ async function load(){
   // receive the same root transform and remain correctly aligned.
   const box=new THREE.Box3().setFromObject(body);
   const center=box.getCenter(new THREE.Vector3());
-  // Centre the source model before applying its Z-up to Y-up conversion.
-  root.position.set(-center.x,center.z,-center.y);
+  root.position.set(-center.x,-center.y,-center.z);
   camera.position.set(5.2,2.6,6.4);orbit.target.set(0,0,0);orbit.update();
   applySetup();$('loading').remove();
  }catch(err){console.error(err);$('loading').textContent='Could not load model files. Check the GLBs are in the same folder.'}
