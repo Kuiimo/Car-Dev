@@ -1,4 +1,1 @@
-S13 Wheel Studio — adjustable front and rear ET
-Upload all website files to the root of your car-dev GitHub repository.
-ET +20 is the starting visual reference. Lower ET moves the wheels outward, higher ET inward.
-The values are visual estimates and are not certified physical wheel offset/clearance measurements.
+S13 custom tyre build. Upload index.html, styles.css, app.js, silvia-s13.glb, ssr_longchamp_xr4.glb to your car-dev repo root. Hard refresh after publishing. Replaces problematic imported tyre geometry with generated tyres, and replaces misplaced 180SX lip with a bumper-following custom lip. ET, camber, ride height retained. Visual preview only.

@@ -29,7 +29,46 @@ const lipMaterial=new THREE.MeshStandardMaterial({color:0xe6e8eb,metalness:.95,r
 const innerMaterial=new THREE.MeshStandardMaterial({color:0xb9bec4,metalness:.75,roughness:.27});
 const boltMaterial=new THREE.MeshStandardMaterial({color:0xd3d7dc,metalness:.9,roughness:.21});
 const faceMaterial=new THREE.MeshStandardMaterial({color:config.face,metalness:.76,roughness:.28});
-const tireMaterial=new THREE.MeshStandardMaterial({color:0x17191c,roughness:.94});
+const tireMaterial=new THREE.MeshStandardMaterial({color:0x111215,roughness:.97,metalness:0,side:THREE.DoubleSide});
+const tireSidewall=new THREE.MeshStandardMaterial({color:0x151619,roughness:.95,side:THREE.DoubleSide});
+const lipAeroMaterial=new THREE.MeshStandardMaterial({color:0x24262a,roughness:.78,side:THREE.DoubleSide});
+let fittedLip=null;
+// A tyre built as a true annulus, not a flat disc or a mesh taken from the GLB.
+function makeTyre(){
+ const group=new THREE.Group();
+ const outerRadius=.313, innerRadius=.231, width=.205;
+ const tread=new THREE.Mesh(new THREE.CylinderGeometry(outerRadius,outerRadius,width,72,1,true),tireMaterial);
+ tread.rotation.z=Math.PI/2;group.add(tread);
+ for(const sign of [-1,1]){
+  const wall=new THREE.Mesh(new THREE.RingGeometry(innerRadius,outerRadius,72),tireSidewall);
+  wall.rotation.y=Math.PI/2;
+  wall.position.x=sign*width/2;
+  group.add(wall);
+  // Slightly rounded outer shoulder, keeping the rim centre unobstructed.
+  const shoulder=new THREE.Mesh(new THREE.TorusGeometry(outerRadius-.013,.014,10,72),tireMaterial);
+  shoulder.rotation.y=Math.PI/2;shoulder.position.x=sign*(width/2-.008);group.add(shoulder);
+ }
+ return group;
+}
+// Build a bumper-following aero lip directly in the Silvia's coordinate system.
+function makeFittedLip(){
+ const g=new THREE.Group();
+ // Front is negative Z on the original upright PS13 model.
+ const curve=new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-.87,.195,-1.93),
+  new THREE.Vector3(-.85,.17,-2.12),
+  new THREE.Vector3(-.68,.16,-2.265),
+  new THREE.Vector3(-.36,.145,-2.303),
+  new THREE.Vector3(0,.14,-2.315),
+  new THREE.Vector3(.36,.145,-2.303),
+  new THREE.Vector3(.68,.16,-2.265),
+  new THREE.Vector3(.85,.17,-2.12),
+  new THREE.Vector3(.87,.195,-1.93)
+ ],false,'centripetal');
+ const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,64,.042,8,false),lipAeroMaterial);
+ g.add(mesh);
+ return g;
+}
 const loader=new GLTFLoader();
 let xr4Scene;
 
@@ -99,7 +138,7 @@ function makeSSR(type,side){
 function applySetup(){
  faceMaterial.color.set(config.face);
  bodyRoot.position.y=-config.ride/1000;
- if(lipObject)lipObject.visible=config.lip==='on';
+ if(fittedLip)fittedLip.visible=config.lip==='on';
  for(const w of wheelSets){
   const angle=THREE.MathUtils.degToRad(w.front?config.front:config.rear);
   // Negative camber means tops inward, on both sides.
@@ -108,14 +147,20 @@ function applySetup(){
   // Apply offset to the entire corner assembly so camber still pivots about its hub.
   const et=w.front?config.frontET:config.rearET;
   w.pivot.position.x=w.x+Math.sign(w.x)*(20-et)/1000;
-  w.factory.visible=true;
-  for(const part of w.factory.children){const n=part.name.toLowerCase();part.visible=config.wheel==='stock'||n.includes('wheel_tire')||n.includes('brake_')}
-  w.aftermarket.visible=config.wheel!=='stock';
+  w.factory.visible=config.wheel==='stock';
+  for(const part of w.factory.children){
+   const n=part.name.toLowerCase();
+   // All original tyre meshes are hidden. Only original factory rims remain in stock mode.
+   part.visible=config.wheel==='stock'&&!n.includes('wheel_tire');
+  }
+  w.aftermarket.visible=true;
   while(w.aftermarket.children.length){
    const child=w.aftermarket.children[0];w.aftermarket.remove(child);
    child.traverse(obj=>{if(obj.geometry)obj.geometry.dispose()});
   }
   if(config.wheel!=='stock'&&xr4Scene)w.aftermarket.add(makeSSR(config.wheel,Math.sign(w.x)));
+  // Every setup uses our own tyre geometry, including factory wheels.
+  w.aftermarket.add(makeTyre());
  }
  $('rideOut').textContent=`−${config.ride} mm`;
  $('frontOut').textContent=`${Number(config.front).toFixed(1)}°`;
@@ -136,8 +181,8 @@ $('toggle').onclick=()=>panel(true);$('close').onclick=()=>panel(false);panel(in
 
 async function load(){
  try{
-  const [car,ssr,lip]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_longchamp_xr4.glb'),loader.loadAsync('./180sx-front-lip.glb')]);
-  lipObject=lip.scene;bodyRoot.add(lipObject);
+  const [car,ssr]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_longchamp_xr4.glb')]);
+  fittedLip=makeFittedLip();bodyRoot.add(fittedLip);
   xr4Scene=ssr.scene;
   const body=car.scene;body.updateMatrixWorld(true);
   const wheels=[];
