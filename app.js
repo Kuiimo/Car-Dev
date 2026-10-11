@@ -38,13 +38,13 @@ function makeTyre(){
  // Revolved, CLOSED cross-section. Axis of the wheel is X; the tyre has real
  // tread thickness, shoulders and sidewalls, with a hole for the wheel face.
  const wheel=new THREE.Group();
- const half=.112,inner=.224,outer=.326;
+ const half=.176,inner=.252,outer=.365;
  const profile=[
-  new THREE.Vector2(inner,-half),new THREE.Vector2(.265,-half),
-  new THREE.Vector2(.300,-half+.007),new THREE.Vector2(.317,-half+.025),
-  new THREE.Vector2(outer,-half+.042),new THREE.Vector2(outer,half-.042),
-  new THREE.Vector2(.317,half-.025),new THREE.Vector2(.300,half-.007),
-  new THREE.Vector2(.265,half),new THREE.Vector2(inner,half),
+  new THREE.Vector2(inner,-half),new THREE.Vector2(.276,-half),
+  new THREE.Vector2(.326,-half+.014),new THREE.Vector2(.352,-half+.032),
+  new THREE.Vector2(outer,-half+.055),new THREE.Vector2(outer,half-.055),
+  new THREE.Vector2(.352,half-.032),new THREE.Vector2(.326,half-.014),
+  new THREE.Vector2(.276,half),new THREE.Vector2(inner,half),
   new THREE.Vector2(inner,-half)
  ];
  const geom=new THREE.LatheGeometry(profile,96);
@@ -53,8 +53,8 @@ function makeTyre(){
  const tyre=new THREE.Mesh(geom,tireMaterial);wheel.add(tyre);
  // Narrow sidewall relief rings, still with a clear centre.
  for(const side of [-1,1]){
-  const detail=new THREE.Mesh(new THREE.TorusGeometry(.278,.0035,8,96),tireSidewall);
-  detail.rotation.y=Math.PI/2;detail.position.x=side*.114;wheel.add(detail);
+  const detail=new THREE.Mesh(new THREE.TorusGeometry(.306,.0028,8,96),tireSidewall);
+  detail.rotation.y=Math.PI/2;detail.position.x=side*.177;wheel.add(detail);
  }
  return wheel;
 }
@@ -84,7 +84,7 @@ let xr4Scene;
 for(const z of [HUB_FRONT,HUB_REAR])for(const x of [-HUB_X,HUB_X]){
  const pivot=new THREE.Group();pivot.position.set(x,HUB_Y,z);wheelRoot.add(pivot);
  const factory=new THREE.Group(),aftermarket=new THREE.Group();pivot.add(factory,aftermarket);
- wheelSets.push({x,z,pivot,factory,aftermarket,front:z===HUB_FRONT});
+ wheelSets.push({x,z,pivot,factory,aftermarket,front:z===HUB_REAR});
 }
 
 // The car GLB combines all four wheels into each mesh. Divide each wheel mesh
@@ -137,8 +137,10 @@ function makeSSR(type,side){
   g.scale(.205,.205,.205);
   // Keep lip at outer side; face just behind the outer rim edge.
   if(n.includes('spokes')||n.includes('lugs'))g.translate(side*.04,0,0);
-  const material=n.includes('chrome')?lipMaterial:n.includes('bolts')?boltMaterial:
-    n.includes('spokes')?faceMaterial:innerMaterial;
+  const original=Array.isArray(o.material)?o.material[0]:o.material;
+  const material=n.includes('spokes')?faceMaterial:
+    original ? original.clone() : (n.includes('chrome')?lipMaterial:innerMaterial);
+  if(material!==faceMaterial){material.metalness=Math.max(material.metalness||0,.78);material.roughness=Math.min(material.roughness||.3,.22);}
   wheel.add(new THREE.Mesh(g,material));
  });
  if(side<0)wheel.rotation.y=Math.PI;
@@ -191,7 +193,11 @@ $('toggle').onclick=()=>panel(true);$('close').onclick=()=>panel(false);panel(in
 async function load(){
  try{
   const [car,ssr]=await Promise.all([loader.loadAsync('./silvia-s13.glb'),loader.loadAsync('./ssr_longchamp_xr4.glb')]);
-  fittedLip=makeFittedLip();bodyRoot.add(fittedLip);
+  const lipGLB=await loader.loadAsync('./original-180sx-front-section.glb');
+  fittedLip=lipGLB.scene;
+  fittedLip.traverse(m=>{if(m.isMesh){m.material=new THREE.MeshStandardMaterial({color:0x292b2d,metalness:.08,roughness:.78,side:THREE.DoubleSide});}});
+  // Extracted original 180SX front-bumper triangles are aligned to the Silvia in preprocessing.
+  bodyRoot.add(fittedLip);
   xr4Scene=ssr.scene;
   const body=car.scene;body.updateMatrixWorld(true);
   const wheels=[];
