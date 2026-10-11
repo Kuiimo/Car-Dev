@@ -35,38 +35,47 @@ const lipAeroMaterial=new THREE.MeshStandardMaterial({color:0x24262a,roughness:.
 let fittedLip=null;
 // A tyre built as a true annulus, not a flat disc or a mesh taken from the GLB.
 function makeTyre(){
- const group=new THREE.Group();
- const outerRadius=.313, innerRadius=.231, width=.205;
- const tread=new THREE.Mesh(new THREE.CylinderGeometry(outerRadius,outerRadius,width,72,1,true),tireMaterial);
- tread.rotation.z=Math.PI/2;group.add(tread);
- for(const sign of [-1,1]){
-  const wall=new THREE.Mesh(new THREE.RingGeometry(innerRadius,outerRadius,72),tireSidewall);
-  wall.rotation.y=Math.PI/2;
-  wall.position.x=sign*width/2;
-  group.add(wall);
-  // Slightly rounded outer shoulder, keeping the rim centre unobstructed.
-  const shoulder=new THREE.Mesh(new THREE.TorusGeometry(outerRadius-.013,.014,10,72),tireMaterial);
-  shoulder.rotation.y=Math.PI/2;shoulder.position.x=sign*(width/2-.008);group.add(shoulder);
+ // Revolved, CLOSED cross-section. Axis of the wheel is X; the tyre has real
+ // tread thickness, shoulders and sidewalls, with a hole for the wheel face.
+ const wheel=new THREE.Group();
+ const half=.112,inner=.224,outer=.326;
+ const profile=[
+  new THREE.Vector2(inner,-half),new THREE.Vector2(.265,-half),
+  new THREE.Vector2(.300,-half+.007),new THREE.Vector2(.317,-half+.025),
+  new THREE.Vector2(outer,-half+.042),new THREE.Vector2(outer,half-.042),
+  new THREE.Vector2(.317,half-.025),new THREE.Vector2(.300,half-.007),
+  new THREE.Vector2(.265,half),new THREE.Vector2(inner,half),
+  new THREE.Vector2(inner,-half)
+ ];
+ const geom=new THREE.LatheGeometry(profile,96);
+ // Lathe's revolution axis is Y; the Silvia's wheel axle is X.
+ geom.rotateZ(-Math.PI/2);
+ const tyre=new THREE.Mesh(geom,tireMaterial);wheel.add(tyre);
+ // Narrow sidewall relief rings, still with a clear centre.
+ for(const side of [-1,1]){
+  const detail=new THREE.Mesh(new THREE.TorusGeometry(.278,.0035,8,96),tireSidewall);
+  detail.rotation.y=Math.PI/2;detail.position.x=side*.114;wheel.add(detail);
  }
- return group;
+ return wheel;
 }
-// Build a bumper-following aero lip directly in the Silvia's coordinate system.
+// The front of this specific Silvia GLB is +Z. The previous lip was at -Z
+// (the rear bumper), hence the loop shown under the exhaust in the screenshot.
 function makeFittedLip(){
  const g=new THREE.Group();
- // Front is negative Z on the original upright PS13 model.
- const curve=new THREE.CatmullRomCurve3([
-  new THREE.Vector3(-.87,.195,-1.93),
-  new THREE.Vector3(-.85,.17,-2.12),
-  new THREE.Vector3(-.68,.16,-2.265),
-  new THREE.Vector3(-.36,.145,-2.303),
-  new THREE.Vector3(0,.14,-2.315),
-  new THREE.Vector3(.36,.145,-2.303),
-  new THREE.Vector3(.68,.16,-2.265),
-  new THREE.Vector3(.85,.17,-2.12),
-  new THREE.Vector3(.87,.195,-1.93)
- ],false,'centripetal');
- const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,64,.042,8,false),lipAeroMaterial);
- g.add(mesh);
+ const points=[[-.81,1.95],[-.81,2.09],[-.68,2.22],[-.43,2.265],[0,2.28],[.43,2.265],[.68,2.22],[.81,2.09],[.81,1.95]];
+ // A thin, continuous apron under the bumper, not a round tube.
+ const verts=[],uv=[],indices=[];
+ for(let i=0;i<points.length;i++){
+  const [x,z]=points[i];
+  for(const [y,shift] of [[.245,0],[.164,.014],[.150,.053]]){
+   verts.push(x,y,z+shift);uv.push(i/(points.length-1),y);
+  }
+ }
+ for(let i=0;i<points.length-1;i++)for(let j=0;j<2;j++){
+  const a=i*3+j,b=a+3;indices.push(a,b,a+1,b,b+1,a+1);
+ }
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(indices);geo.computeVertexNormals();
+ g.add(new THREE.Mesh(geo,lipAeroMaterial));
  return g;
 }
 const loader=new GLTFLoader();
